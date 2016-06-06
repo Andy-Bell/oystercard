@@ -1,9 +1,12 @@
 require 'journey'
 
 describe Journey do
-  subject (:journey) { described_class.new }
-  let(:station1) { double(:station1, :data => {:monument => 1}) }
-  let(:station2) { double(:station2, :data => {:aldgate_east => 2}) }
+  subject (:journey) { described_class.new(balance_spy) }
+  let(:station1) { double(:station1, :zone => 2) }
+  let(:station2) { double(:station2, :zone => 4) }
+
+  let(:balance_spy) { spy(:balance_spy) } 
+  let(:log_spy) { spy(:log_spy) }
 
   describe "#start" do
 
@@ -14,6 +17,11 @@ describe Journey do
     it 'sets start station' do
       journey.start(station1)
       expect(journey.entry_station).to eq station1
+    end
+
+    it 'charges a penalty fare' do
+      journey.start(station1)
+      expect{journey.start(station1)}.to raise_error("Penalty fare has been charged, try again")
     end
   end
 
@@ -29,34 +37,31 @@ describe Journey do
 
     it 'sets the end station' do
       journey.finish(station2)
-      expect(journey.end_station).to eq station2
+      expect(journey.all_journeys.all.last.values.pop).to eq station2
     end
-  end
-
-  describe '#fare' do
-    it 'has a default fare value' do
-      expect(journey.fare).to eq 1
-    end
-
-    # it 'charges penalty fare' do
-    #   journey.finish(station2)
-    #   expect(journey.fare).to eq 6
-    # end
-  end
-
-  describe '#fresh' do
-    before(:each) do
-      journey.start(station1)
+    
+    it 'calls deduct on balance' do
       journey.finish(station2)
+      expect(balance_spy).to have_received(:deduct)
+    end
+
+    context 'penalty fare' do
+      before do
+        journey.finish(station2)
+      end
+      
+      it 'charges a penalty fare when the user attemts to finish before start is called' do
+        expect{ journey.finish(station2) }.to raise_error("Penalty fare has been charged, try again")
+      end
     end
 
     it 'clears entry station' do
-      journey.fresh
+      journey.finish(station2)
       expect(journey.entry_station).to eq nil
     end
 
     it 'clears exit station' do
-      journey.fresh
+      journey.finish(station2)
       expect(journey.end_station).to eq nil
     end
   end
@@ -72,27 +77,22 @@ describe Journey do
   end
 
   describe ':all_journeys' do
-    it 'creates an empty all_journeys hash' do
-      expect(journey.all_journeys).to be_a(Hash)
-    end
     
     context 'recording journeys' do
-      before(:each) do
-        journey.start(station1)
-        journey.finish(station2)
-      end
 
       it 'generates a journey' do
-        expect(journey.all_journeys).to eq({station1 => station2})
+        spy_journey = Journey.new(balance_spy, log_spy)
+        spy_journey.all_journeys.all
+        expect(log_spy).to have_recieved(:all)
       end
       
       it'generates multiple journeys' do
-        3.times do
+        4.times do
           journey.start(station1)
           journey.finish(station2)
         end
-        expect(journey.all_journeys).to eq({station1 => station2,
-          station1 => station2, station1 => station2, station1 =>station2})
+        expect(journey.all_journeys.all).to eq([{station1 => station2},
+          {station1 => station2}, {station1 => station2}, {station1 => station2}])
       end
     end
   end
