@@ -1,4 +1,9 @@
-source 'https://rubygems.org'
+<<<<<<< HEAD
+source "https://rubygems.org"
 
 ruby '2.3.1'
-gem 'rspec', '3.4.0'
+
+group :development, :test do
+  gem "rspec"
+end
+
